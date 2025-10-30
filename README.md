@@ -97,4 +97,4 @@ Size: 1.2 MB
 
 ## License
 
-MIT (or your choice)
+GNU 3.0
