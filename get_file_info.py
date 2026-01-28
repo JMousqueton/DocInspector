@@ -100,13 +100,34 @@ if __name__ == "__main__":
         array_table.append(["page_size", info["page_size"]])
         array_table += extract_metadata(filename)
         print_ascii_table(array_table, ["Property", "Value"])
-        urls = extract_link_annotations(filename)
-        print("\nEmbedded URLs:")
-        if urls:
-            for url in urls:
-                print("  -", url)
+
+        # Robust canarytoken/URL detection (raw scan)
+        from libs.pdf import extract_urls_from_pdf_raw, detect_canarytokens
+        all_urls = extract_urls_from_pdf_raw(filename)
+        print("\nAll URLs found in PDF:")
+        if all_urls:
+            for url in all_urls:
+                if "purl.org" in url.lower():
+                    continue
+                green_flag = ""
+                if "microsoft.com" in url.lower():
+                    green_flag += " [\033[92mMICROSOFT\033[0m]"
+                if "adobe.com" in url.lower():
+                    green_flag += " [\033[92mADOBE\033[0m]"
+                if "w3.org" in url.lower():
+                    green_flag += " [\033[92mW3 Org\033[0m]"
+                if "canary" in url.lower():
+                    green_flag += " [\033[91mCANARY\033[0m]"
+                print(f"  - {url}{green_flag}")
         else:
             print("  (none found)")
+        canarytokens = detect_canarytokens(all_urls)
+        if canarytokens:
+            print("\n\033[91mWARNING: Canarytoken(s) detected in PDF!\033[0m")
+            for token in canarytokens:
+                print(f"  Suspicious URL: {token}")
+        else:
+            print("\nNo canarytoken URLs detected in PDF.")
 
     elif filetype == "docx":
         info = get_docx_basic_info(filename)

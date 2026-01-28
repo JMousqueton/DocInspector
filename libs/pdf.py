@@ -1,7 +1,28 @@
 import re
+import zlib
 from collections import Counter
 from datetime import datetime
 from PyPDF2 import PdfReader
+
+# CanaryTokenScanner-style regexes for PDF raw URL extraction
+URL_BYTES_RE = re.compile(rb'https?://[^\s<>"]+')
+PDF_STREAM_RE = re.compile(rb'stream[\r\n\s]+(.*?)[\r\n\s]+endstream', re.DOTALL)
+
+def detect_canarytokens(urls):
+    """Detect canarytoken URLs in a list of URLs."""
+    canary_patterns = [
+        r"canarytokens\.[a-z]+",
+        r"canary\.[a-z]+",
+        # Add more patterns as needed
+    ]
+    suspicious = []
+    for url in urls:
+        clean_url = url.rstrip(')>.,;\'\"]')
+        for pat in canary_patterns:
+            if re.search(pat, clean_url, re.IGNORECASE):
+                suspicious.append(url)
+    return suspicious
+
 
 PDF_META_FIELDS = [
     "/Title", "/Author", "/Subject", "/Keywords", "/Creator", "/Producer",
@@ -121,4 +142,22 @@ def get_pdf_basic_info(pdf_file):
         "num_pages": num_pages,
         "page_size": page_size
     }
+
+def extract_urls_from_pdf_raw(pdf_path):
+    """Extract all URLs from raw PDF bytes and decompressed streams (robust, CanaryTokenScanner style)."""
+    urls = set()
+    with open(pdf_path, "rb") as f:
+        pdf_content = f.read()
+        # URLs in raw bytes
+        urls.update(u.decode('utf-8', 'ignore') for u in URL_BYTES_RE.findall(pdf_content))
+        # URLs in decompressed streams
+        for m in PDF_STREAM_RE.finditer(pdf_content):
+            stream = m.group(1)
+            for decompress_flag in [zlib.MAX_WBITS, -zlib.MAX_WBITS]:
+                try:
+                    decompressed = zlib.decompress(stream, decompress_flag)
+                    urls.update(u.decode('utf-8', 'ignore') for u in URL_BYTES_RE.findall(decompressed))
+                except Exception:
+                    continue
+    return sorted(urls)
 
