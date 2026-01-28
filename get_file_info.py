@@ -112,12 +112,14 @@ if __name__ == "__main__":
                 green_flag = ""
                 if "microsoft.com" in url.lower():
                     green_flag += " [\033[92mMICROSOFT\033[0m]"
-                if "adobe.com" in url.lower():
+                elif "adobe.com" in url.lower():
                     green_flag += " [\033[92mADOBE\033[0m]"
-                if "w3.org" in url.lower():
+                elif "w3.org" in url.lower():
                     green_flag += " [\033[92mW3 Org\033[0m]"
-                if "canary" in url.lower():
+                elif "canary" in url.lower():
                     green_flag += " [\033[91mCANARY\033[0m]"
+                else:
+                    green_flag += " [\033[90mUNKNOWN\033[0m]"
                 print(f"  - {url}{green_flag}")
         else:
             print("  (none found)")
