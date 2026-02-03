@@ -73,6 +73,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Extract file info from documents.")
     parser.add_argument("filename", help="Path to the file to analyze.")
     parser.add_argument("--debug", "-D", action="store_true", help="Show raw metadata for PDF.")
+    parser.add_argument("--ALL", "-A", action="store_true", help="Show ALL URLs (including metadata)")
     args = parser.parse_args()
     filename = args.filename
 
@@ -116,7 +117,21 @@ if __name__ == "__main__":
         # Robust canarytoken/URL detection (raw scan)
         from libs.pdf import extract_urls_from_pdf_raw, detect_canarytokens
         all_urls = extract_urls_from_pdf_raw(filename)
-        print("\nAll URLs found in PDF:")
+        meta_urls = []
+        if args.ALL:
+            # Extract URLs from metadata as well
+            from PyPDF2 import PdfReader
+            with open(filename, "rb") as f:
+                reader = PdfReader(f)
+                metadata = reader.metadata
+                meta_urls = []
+                for v in dict(metadata).values():
+                    if isinstance(v, str) and ("http://" in v or "https://" in v):
+                        meta_urls += [u for u in v.split() if u.startswith("http://") or u.startswith("https://")]
+            all_urls += meta_urls
+            print("\nALL URLs found in PDF (including metadata):")
+        else:
+            print("\nURLs found in PDF document content:")
         if all_urls:
             for url in all_urls:
                 if "purl.org" in url.lower():
