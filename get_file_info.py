@@ -1,5 +1,6 @@
 import sys
 import os
+import argparse
 from libs.pdf import get_pdf_basic_info, extract_metadata, extract_link_annotations
 from libs.doc import get_docx_basic_info
 from libs.ppt import is_pptx_file, get_pptx_basic_info
@@ -68,10 +69,12 @@ if __name__ == "__main__":
     print('v1.1                                                             ░██                                                            ')
     print('                                                                 ░██                                                            ')
     print('                                                                                                                              ')
-    if len(sys.argv) < 2:
-        print("Usage: python extract.py <file>")
-        sys.exit(1)
-    filename = sys.argv[1]
+
+    parser = argparse.ArgumentParser(description="Extract file info from documents.")
+    parser.add_argument("filename", help="Path to the file to analyze.")
+    parser.add_argument("--debug", "-D", action="store_true", help="Show raw metadata for PDF.")
+    args = parser.parse_args()
+    filename = args.filename
 
     # Detect file type by signature
     if is_pdf_file(filename):
@@ -98,7 +101,16 @@ if __name__ == "__main__":
         array_table.append(["is_encrypted", info["is_encrypted"]])
         array_table.append(["num_pages", info["num_pages"]])
         array_table.append(["page_size", info["page_size"]])
-        array_table += extract_metadata(filename)
+        meta_rows = extract_metadata(filename)
+        array_table += meta_rows
+        if args.debug:
+            from PyPDF2 import PdfReader
+            with open(filename, "rb") as f:
+                reader = PdfReader(f)
+                metadata = reader.metadata
+                print("\n[DEBUG] Raw PDF metadata:")
+                for k, v in dict(metadata).items():
+                    print(f"  {k}: {v}")
         print_ascii_table(array_table, ["Property", "Value"])
 
         # Robust canarytoken/URL detection (raw scan)
