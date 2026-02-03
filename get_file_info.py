@@ -114,24 +114,33 @@ if __name__ == "__main__":
                     print(f"  {k}: {v}")
         print_ascii_table(array_table, ["Property", "Value"])
 
-        # Robust canarytoken/URL detection (raw scan)
-        from libs.pdf import extract_urls_from_pdf_raw, detect_canarytokens
-        all_urls = extract_urls_from_pdf_raw(filename)
-        meta_urls = []
+        # URL extraction logic
+        from libs.pdf import extract_urls_from_pdf_raw, extract_link_annotations, detect_canarytokens
+        url_sources = {}
+        raw_urls = extract_urls_from_pdf_raw(filename)
         if args.ALL:
+            all_urls = raw_urls
             # Extract URLs from metadata as well
+            meta_urls = []
             from PyPDF2 import PdfReader
             with open(filename, "rb") as f:
                 reader = PdfReader(f)
                 metadata = reader.metadata
-                meta_urls = []
                 for v in dict(metadata).values():
                     if isinstance(v, str) and ("http://" in v or "https://" in v):
-                        meta_urls += [u for u in v.split() if u.startswith("http://") or u.startswith("https://")]
-            all_urls += meta_urls
-            print("\nALL URLs found in PDF (including metadata):")
+                        for u in v.split():
+                            if u.startswith("http://") or u.startswith("https://"):
+                                meta_urls.append(u)
+                                url_sources[u] = "metadata"
+            for u in all_urls:
+                url_sources[u] = "content"
+            all_urls += [u for u in meta_urls if u not in all_urls]
+            print("\nALL URLs found in PDF (raw scan + metadata):")
         else:
-            print("\nURLs found in PDF document content:")
+            all_urls = extract_link_annotations(filename)
+            for u in all_urls:
+                url_sources[u] = "annotation"
+            print("\nURLs found in PDF link annotations (visible/clickable):")
         if all_urls:
             for url in all_urls:
                 if "purl.org" in url.lower():
@@ -143,14 +152,16 @@ if __name__ == "__main__":
                     green_flag += " [\033[92mADOBE\033[0m]"
                 elif "w3.org" in url.lower():
                     green_flag += " [\033[92mW3 Org\033[0m]"
+                elif "wikipedia.org" in url.lower():
+                    green_flag += " [\033[92mWIKIPEDIA\033[0m]"
                 elif "canary" in url.lower():
                     green_flag += " [\033[91mCANARY\033[0m]"
-                else:
+                elif args.ALL:
                     green_flag += " [\033[90mUNKNOWN\033[0m]"
                 print(f"  - {url}{green_flag}")
         else:
             print("  (none found)")
-        canarytokens = detect_canarytokens(all_urls)
+        canarytokens = detect_canarytokens(raw_urls)
         if canarytokens:
             print("\n\033[91mWARNING: Canarytoken(s) detected in PDF!\033[0m")
             for token in canarytokens:
